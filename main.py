@@ -40,15 +40,13 @@ async def startup_event():
     global _ensemble, _video_detector, _audio_detector, _video_processor
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    print(f"[DeepShield API] Loading Forensic Multi-Branch Ensemble on {device}…")
+    # Lightweight Init (Models load lazily on first request)
     _ensemble = ForensicEnsemble(device)
-    
-    print(f"[DeepShield API] Loading Research-Grade Multimodal Video Judge on {device}…")
     _video_detector = MultimodalDetector(device)
-    _audio_detector = AudioTransformer().to(device)
+    _audio_detector = None # Lazy load in /analyze-audio
     _video_processor = VideoProcessor()
     
-    print("[DeepShield API] 🟢 Research-Grade Multi-Modal Engine Ready")
+    print("[DeepShield API] 🟢 Research-Grade Multi-Modal Engine Ready (Lazy Mode)")
 
 @app.post("/detect-image")
 async def detect_image(file: UploadFile = File(...)):
@@ -149,13 +147,18 @@ async def analyze_audio(file: UploadFile = File(...)):
     temp_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file.filename}")
     
     try:
+        global _audio_detector
+        if _audio_detector is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            _audio_detector = AudioTransformer().to(device)
+            _audio_detector.eval()
+
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        audio_mel = extract_log_mel(temp_path).unsqueeze(0).to(_audio_detector.parameters().__next__().device)
+        audio_mel = extract_log_mel(temp_path).unsqueeze(0).to(next(_audio_detector.parameters()).device)
         
         with torch.no_grad():
-            # A simple temporal polling for audio
             feats = _audio_detector(audio_mel)
             score = torch.sigmoid(feats.mean()).item() * 100
             

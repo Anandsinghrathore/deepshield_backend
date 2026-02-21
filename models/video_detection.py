@@ -48,15 +48,15 @@ class VideoFeatureExtractor(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        # Load pre-trained EfficientNet-B4
-        self.backbone = timm.create_model('efficientnet_b4', pretrained=True, num_classes=0, global_pool='')
+        # Use EfficientNet-B0 for production/Railway RAM efficiency (B4 was too heavy)
+        self.backbone = timm.create_model('efficientnet_b0', pretrained=True, num_classes=0, global_pool='')
         
-        # Add Spectral Attention at a deep layer (level 3 or 4)
-        # For EfficientNet-B4, level 3 features have around 56x56 or 28x28 resol
-        self.spectral_atten = SpectralAttention(160) # 160 is a common mid-layer dim for B4
+        # Add Spectral Attention at a deep layer
+        # For B0, level 3 features are around 40-80 channels
+        self.spectral_atten = SpectralAttention(80) 
 
-        # Register final spectral attention (features from B4 are 1792)
-        self.final_spectral_atten = SpectralAttention(1792)
+        # Register final spectral attention (features from B0 are 1280)
+        self.final_spectral_atten = SpectralAttention(1280)
 
     def forward(self, x):
         # x: (B, C, H, W)

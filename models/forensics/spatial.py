@@ -9,16 +9,16 @@ class SpatialBranch(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        # Upgrade to Swin-Base for significantly higher feature depth (1024 channels)
-        backbone = models.swin_b(weights=models.Swin_B_Weights.IMAGENET1K_V1)
+        # Use Swin-Tiny for better performance on memory-constrained servers (Railway)
+        backbone = models.swin_t(weights=models.Swin_T_Weights.IMAGENET1K_V1)
         self.features = backbone.features
         self.norm = backbone.norm
         self.avgpool = backbone.avgpool
         
         # Binary output: Real (0) vs AI (1)
-        # Swin-Base feature dim is 1024
+        # Swin-Tiny feature dim is 768 (Base was 1024)
         self.classifier = nn.Sequential(
-            nn.Linear(1024, 1),
+            nn.Linear(768, 1),
             nn.Sigmoid()
         )
 

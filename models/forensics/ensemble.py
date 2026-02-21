@@ -19,14 +19,26 @@ class ForensicEnsemble(nn.Module):
         super().__init__()
         self.device = device
         
-        # Initialize Branches
-        self.spatial = SpatialBranch().to(device)
-        self.frequency = FrequencyBranch().to(device)
-        self.noise = NoiseBranch().to(device)
+        # Lazy Initialization (to save RAM during startup)
+        self.spatial = None
+        self.frequency = None
+        self.noise = None
+        self.metadata = None
+        self.patch_scanner = None
+
+    def _lazy_load(self):
+        """Load branches into memory only when needed."""
+        if self.spatial is not None:
+            return  # Already loaded
+            
+        print("[DeepShield] 🚀 Lazy loading ensemble branches...")
+        self.spatial = SpatialBranch().to(self.device)
+        self.frequency = FrequencyBranch().to(self.device)
+        self.noise = NoiseBranch().to(self.device)
         self.metadata = MetadataBranch()
-        self.patch_scanner = PatchScanner(self.spatial, device)
+        self.patch_scanner = PatchScanner(self.spatial, self.device)
         
-        # Load Optimized Weights if available (The "More Trained" logic)
+        # Load Optimized Weights
         self._load_optimized_weights("spatial", self.spatial)
         self._load_optimized_weights("frequency", self.frequency)
         self._load_optimized_weights("noise", self.noise)
@@ -34,6 +46,7 @@ class ForensicEnsemble(nn.Module):
         self.spatial.eval()
         self.frequency.eval()
         self.noise.eval()
+        print("[DeepShield] ✅ Models loaded into memory.")
 
     def _checksum_model(self, model):
         """Debug helper: returns a checksum of model parameters."""
@@ -58,6 +71,7 @@ class ForensicEnsemble(nn.Module):
         Complete forensic analysis of an image.
         Returns multi-branch scores and final probability.
         """
+        self._lazy_load()
         import cv2
         import PIL.Image as PILImage
         img = cv2.imread(image_path)

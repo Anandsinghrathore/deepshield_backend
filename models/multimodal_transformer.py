@@ -8,7 +8,7 @@ class CrossModalAttention(nn.Module):
     Cross-Modal Attention: Audio-Visual Alignment.
     L-Sync: Captures lip-sync and modal mismatches.
     """
-    def __init__(self, v_dim=1792, a_dim=512, inner_dim=512):
+    def __init__(self, v_dim=1280, a_dim=512, inner_dim=512):
         super().__init__()
         self.q_proj = nn.Linear(v_dim, inner_dim)
         self.k_proj = nn.Linear(a_dim, inner_dim)
@@ -40,32 +40,41 @@ class MultimodalDetector(nn.Module):
         super().__init__()
         self.device = device
         
-        # 1. Branches
-        self.video_branch = VideoFeatureExtractor().to(device)
-        self.video_temporal = TemporalTransformer(input_dim=1792).to(device)
+        # Lazy loading to save RAM
+        self.video_branch = None
+        self.video_temporal = None
+        self.audio_branch = None
+        self.cross_modal = None
+        self.classifier_a = None
+        self.classifier_b = None
+
+    def _lazy_load(self):
+        if self.video_branch is not None:
+            return
+            
+        print("[DeepShield] 🚀 Lazy loading Multimodal branches...")
+        self.video_branch = VideoFeatureExtractor().to(self.device)
+        self.video_temporal = TemporalTransformer(input_dim=1280).to(self.device)
+        self.audio_branch = AudioTransformer().to(self.device)
+        self.cross_modal = CrossModalAttention(v_dim=1280, a_dim=512).to(self.device)
         
-        self.audio_branch = AudioTransformer().to(device)
-        
-        # 2. Fusion
-        self.cross_modal = CrossModalAttention(v_dim=1792, a_dim=512).to(device)
-        
-        # 3. Final Head (Ensemble Light for Uncertainty)
-        # Two heads for "Deep Ensemble" effect
         self.classifier_a = nn.Sequential(
             nn.Linear(512, 128),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.Sigmoid()
-        ).to(device)
+        ).to(self.device)
         
         self.classifier_b = nn.Sequential(
             nn.Linear(512, 128),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.Sigmoid()
-        ).to(device)
+        ).to(self.device)
+        print("[DeepShield] ✅ Multimodal branches loaded.")
 
     def forward(self, frames, audio_mel):
+        self._lazy_load()
         # frames: (B, T_v, C, H, W)
         # audio_mel: (B, MelBins, T_a)
         
