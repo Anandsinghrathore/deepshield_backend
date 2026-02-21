@@ -32,3 +32,11 @@ deepshield.db
 # Temp files
 /tmp/
 *.tmp
+temp_uploads/
+
+# Production excludes
+train/
+tests/
+weights/*.pt
+.git/
+.github/
